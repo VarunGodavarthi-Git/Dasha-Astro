@@ -1,0 +1,12 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+SQLAlchemy==2.0.36
+pydantic[email]==2.10.4
+python-dotenv==1.0.1
+requests==2.32.3
+geopy==2.4.1
+google-genai==1.49.0
+pyswisseph==2.10.3.2
+timezonefinder==6.5.7
+tzdata==2026.2
+pytest==8.3.4
