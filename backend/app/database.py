@@ -36,16 +36,3 @@ def get_db():
     finally:
         db.close()
 
-from fastapi.middleware.cors import CORSMiddleware
-
-origins = [
-    "https://dasha-astro-r3z1je8cb-varun-godavarthi-s-projects.vercel.app",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)

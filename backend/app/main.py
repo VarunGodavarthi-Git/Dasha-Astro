@@ -200,3 +200,19 @@ def _gemini_stream_and_log(payload: ChartRequest, chart: dict, prompt: str) -> I
 def _require_admin(user_email: str | None) -> None:
     if not user_email or user_email.lower() != ADMIN_EMAIL:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
+    
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+origins = [
+    "https://dasha-astro-r3z1je8cb-varun-godavarthi-s-projects.vercel.app",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
