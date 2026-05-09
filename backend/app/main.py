@@ -11,54 +11,107 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-# FIXED: Using Absolute Imports for Render/Linux compatibility
 from app.database import Base, SessionLocal, engine, get_db
 from app.engine import AstrologyCalculationError, calculate_vedic_chart
 from app.location import CityLookupError, GeocodedCity, geocode_city
 from app.models import ChatLog, SavedChart
-from app.prompts import VEDIC_ASTROLOGY_SYSTEM_PROMPT, build_user_prompt
-from app.schemas import ChartRequest, ChartResponse, ChatLogOut, ClearLogsResponse, LocationSearchResponse
+from app.prompts import (
+    VEDIC_ASTROLOGY_SYSTEM_PROMPT,
+    build_user_prompt,
+)
+from app.schemas import (
+    ChartRequest,
+    ChartResponse,
+    ChatLogOut,
+    ClearLogsResponse,
+    LocationSearchResponse,
+)
 
-# Load environment variables from the root of the backend folder
+# Load environment variables
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
+FRONTEND_ORIGIN = os.getenv(
+    "FRONTEND_ORIGIN",
+    "https://dasha-astro-r3z1je8cb-varun-godavarthi-s-projects.vercel.app",
+)
+
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com").lower()
-NOMINATIM_USER_AGENT = os.getenv("NOMINATIM_USER_AGENT", "dasha-astro-geocoder")
+NOMINATIM_USER_AGENT = os.getenv(
+    "NOMINATIM_USER_AGENT",
+    "dasha-astro-geocoder",
+)
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-GEMINI_MAX_OUTPUT_TOKENS = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "1200"))
 
-app = FastAPI(title="Dasha Astro API", version="0.2.0")
+GEMINI_MAX_OUTPUT_TOKENS = int(
+    os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "1200")
+)
 
-# Updated CORS to handle Vercel deployments
+# FastAPI App
+app = FastAPI(
+    title="Dasha Astro API",
+    version="0.2.0",
+)
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        FRONTEND_ORIGIN, 
-        "http://localhost:3000", 
+        FRONTEND_ORIGIN,
+        "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://dasha-astro-frontend.vercel.app" # You can add your specific Vercel URL here
+        "https://dasha-astro-r3z1je8cb-varun-godavarthi-s-projects.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
+# Startup
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
 
+
+# Root Route
+@app.get("/")
+def root():
+    return {
+        "message": "Dasha Astro Backend Running",
+        "docs": "/docs",
+    }
+
+
+# Health Check
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "llm_provider": "gemini", "model": GEMINI_MODEL}
+    return {
+        "status": "ok",
+        "llm_provider": "gemini",
+        "model": GEMINI_MODEL,
+    }
 
-@app.get("/api/location/search", response_model=LocationSearchResponse)
-def search_location(query: str = Query(..., min_length=2, max_length=120)) -> LocationSearchResponse:
+
+# Location Search
+@app.get(
+    "/api/location/search",
+    response_model=LocationSearchResponse,
+)
+def search_location(
+    query: str = Query(..., min_length=2, max_length=120),
+) -> LocationSearchResponse:
     try:
-        city = geocode_city(query, user_agent=NOMINATIM_USER_AGENT)
+        city = geocode_city(
+            query,
+            user_agent=NOMINATIM_USER_AGENT,
+        )
     except CityLookupError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
 
     return LocationSearchResponse(
         query=city.query,
@@ -68,45 +121,84 @@ def search_location(query: str = Query(..., min_length=2, max_length=120)) -> Lo
         timezone=city.timezone,
     )
 
+
+# Generate Chart
 @app.post("/api/chart", response_model=ChartResponse)
-def create_chart(payload: ChartRequest, db: Session = Depends(get_db)) -> ChartResponse:
+def create_chart(
+    payload: ChartRequest,
+    db: Session = Depends(get_db),
+) -> ChartResponse:
     chart = _calculate_or_422(payload)
     _save_chart(db, payload, chart)
+
     return ChartResponse(chart=chart)
 
+
+# Streaming Endpoint
 @app.post("/api/chart/stream")
-def create_chart_and_stream(payload: ChartRequest, db: Session = Depends(get_db)) -> StreamingResponse:
+def create_chart_and_stream(
+    payload: ChartRequest,
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
     chart = _calculate_or_422(payload)
+
     _save_chart(db, payload, chart)
-    prompt = build_user_prompt(chart, payload.question)
+
+    prompt = build_user_prompt(
+        chart,
+        payload.question,
+    )
 
     return StreamingResponse(
-        _gemini_stream_and_log(payload, chart, prompt),
+        _gemini_stream_and_log(
+            payload,
+            chart,
+            prompt,
+        ),
         media_type="text/plain; charset=utf-8",
     )
 
+
+# Admin Logs
 @app.get("/admin/logs", response_model=list[ChatLogOut])
 def list_logs(
     x_user_email: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> list[ChatLog]:
     _require_admin(x_user_email)
-    return list(db.scalars(select(ChatLog).order_by(ChatLog.created_at.desc())).all())
 
+    return list(
+        db.scalars(
+            select(ChatLog).order_by(ChatLog.created_at.desc())
+        ).all()
+    )
+
+
+# Clear Logs
 @app.delete("/admin/logs", response_model=ClearLogsResponse)
 def clear_logs(
     x_user_email: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ) -> ClearLogsResponse:
     _require_admin(x_user_email)
-    result = db.execute(delete(ChatLog))
-    db.commit()
-    return ClearLogsResponse(deleted=result.rowcount or 0)
 
-# HELPER FUNCTIONS
+    result = db.execute(delete(ChatLog))
+
+    db.commit()
+
+    return ClearLogsResponse(
+        deleted=result.rowcount or 0,
+    )
+
+
+# Helpers
 def _calculate_or_422(payload: ChartRequest) -> dict:
     try:
-        if payload.latitude is not None and payload.longitude is not None and payload.timezone:
+        if (
+            payload.latitude is not None
+            and payload.longitude is not None
+            and payload.timezone
+        ):
             city = GeocodedCity(
                 query=payload.city_name,
                 display_name=payload.city_name,
@@ -114,7 +206,11 @@ def _calculate_or_422(payload: ChartRequest) -> dict:
                 longitude=payload.longitude,
                 timezone=payload.timezone,
             )
-            return calculate_vedic_chart_from_city(payload, city)
+
+            return calculate_vedic_chart_from_city(
+                payload,
+                city,
+            )
 
         return calculate_vedic_chart(
             birth_date=payload.date_of_birth,
@@ -122,22 +218,41 @@ def _calculate_or_422(payload: ChartRequest) -> dict:
             city_name=payload.city_name,
             user_agent=NOMINATIM_USER_AGENT,
         )
-    except (CityLookupError, AstrologyCalculationError) as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
-def calculate_vedic_chart_from_city(payload: ChartRequest, city: GeocodedCity) -> dict:
-    # FIXED: Absolute import here as well
+    except (
+        CityLookupError,
+        AstrologyCalculationError,
+    ) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+
+def calculate_vedic_chart_from_city(
+    payload: ChartRequest,
+    city: GeocodedCity,
+) -> dict:
     from app.engine import build_chart_from_coordinates
+
     return build_chart_from_coordinates(
         birth_date=payload.date_of_birth,
         birth_time=payload.time_of_birth,
         city=city,
     )
 
-def _save_chart(db: Session, payload: ChartRequest, chart: dict) -> None:
+
+def _save_chart(
+    db: Session,
+    payload: ChartRequest,
+    chart: dict,
+) -> None:
     birth = chart["birth"]
+
     saved = SavedChart(
-        user_email=str(payload.user_email) if payload.user_email else None,
+        user_email=str(payload.user_email)
+        if payload.user_email
+        else None,
         user_name=payload.user_name,
         city_name=payload.city_name,
         latitude=birth["latitude"],
@@ -147,21 +262,34 @@ def _save_chart(db: Session, payload: ChartRequest, chart: dict) -> None:
         birth_time=payload.time_of_birth.strftime("%H:%M:%S"),
         chart_json=chart,
     )
+
     db.add(saved)
+
     db.commit()
 
-def _gemini_stream_and_log(payload: ChartRequest, chart: dict, prompt: str) -> Iterator[str]:
+
+def _gemini_stream_and_log(
+    payload: ChartRequest,
+    chart: dict,
+    prompt: str,
+) -> Iterator[str]:
     response_text: list[str] = []
+
     error_text: str | None = None
 
     try:
         if not GEMINI_API_KEY:
-            raise RuntimeError("GEMINI_API_KEY is not configured.")
+            raise RuntimeError(
+                "GEMINI_API_KEY is not configured."
+            )
 
         from google import genai
         from google.genai import types
 
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        client = genai.Client(
+            api_key=GEMINI_API_KEY,
+        )
+
         stream = client.models.generate_content_stream(
             model=GEMINI_MODEL,
             contents=prompt,
@@ -175,18 +303,28 @@ def _gemini_stream_and_log(payload: ChartRequest, chart: dict, prompt: str) -> I
 
         for chunk in stream:
             token = getattr(chunk, "text", None)
+
             if token:
                 response_text.append(token)
                 yield token
+
     except Exception as exc:
         error_text = f"Gemini request failed: {exc}"
         yield error_text
+
     finally:
-        full_response = "".join(response_text) if response_text else error_text or ""
+        full_response = (
+            "".join(response_text)
+            if response_text
+            else error_text or ""
+        )
+
         with SessionLocal() as db:
             db.add(
                 ChatLog(
-                    user_email=str(payload.user_email) if payload.user_email else None,
+                    user_email=str(payload.user_email)
+                    if payload.user_email
+                    else None,
                     user_name=payload.user_name,
                     city_name=payload.city_name,
                     prompt_text=prompt,
@@ -195,24 +333,16 @@ def _gemini_stream_and_log(payload: ChartRequest, chart: dict, prompt: str) -> I
                     model=GEMINI_MODEL,
                 )
             )
+
             db.commit()
 
+
 def _require_admin(user_email: str | None) -> None:
-    if not user_email or user_email.lower() != ADMIN_EMAIL:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required.")
-    
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI()
-origins = [
-    "https://dasha-astro-r3z1je8cb-varun-godavarthi-s-projects.vercel.app",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    if (
+        not user_email
+        or user_email.lower() != ADMIN_EMAIL
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
