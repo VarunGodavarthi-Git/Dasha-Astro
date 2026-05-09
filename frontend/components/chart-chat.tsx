@@ -336,25 +336,41 @@ export function ChartChat() {
       </form>
 
       <section className="space-y-5">
-        {chart?.vargas ? <ChartDisplay vargas={chart.vargas} /> : null}
-
-        {chart?.dasha ? <DashaTable dasha={chart.dasha} /> : null}
-
-        <div className="min-h-[560px] rounded-lg border border-stone-200 bg-white shadow-soft">
-          <div className="flex h-14 items-center gap-2 border-b border-stone-200 px-5">
+        {/* Gemini Response moved to the TOP */}
+        <div className="flex min-h-[560px] flex-col rounded-lg border border-stone-200 bg-white shadow-soft">
+          <div className="flex h-14 items-center gap-2 rounded-t-lg border-b border-stone-200 bg-stone-50 px-5">
             <Bot className="text-river" size={20} />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">Gemini Response</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-600">AI Astrology Reading</h2>
           </div>
-          <div className="p-5">
+          
+          <div className="flex-1 p-5">
+            {/* Display the user's question like a chat message */}
+            {question && status !== "idle" && (
+              <div className="mb-6 rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm text-stone-800">
+                <span className="mb-1 block font-semibold text-stone-600">Your Question:</span>
+                {question}
+              </div>
+            )}
+
+            {/* Display the AI's streamed answer */}
             {answer ? (
               <div className="whitespace-pre-wrap text-sm leading-7 text-ink">{answer}</div>
             ) : (
-              <div className="grid min-h-[440px] place-items-center text-center text-sm text-stone-500">
-                <span>{status === "streaming" ? "Waiting for the first token..." : "The streamed interpretation will appear here."}</span>
+              <div className="grid h-full min-h-[400px] place-items-center text-center text-sm text-stone-500">
+                <span>
+                  {status === "streaming" 
+                    ? "Consulting the stars and analyzing your charts..." 
+                    : "Submit your details and ask a question to generate a reading."}
+                </span>
               </div>
             )}
           </div>
         </div>
+
+        {/* Charts and Data Tables moved BELOW the reading */}
+        {chart?.vargas ? <ChartDisplay vargas={chart.vargas} /> : null}
+
+        {chart?.dasha ? <DashaTable dasha={chart.dasha} /> : null}
       </section>
     </div>
   );

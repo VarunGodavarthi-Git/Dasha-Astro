@@ -55,6 +55,11 @@ const RASHI_ORDER = [
   "Meena",
 ];
 
+const PLANET_ABBR: Record<string, string> = {
+  Sun: "Su", Moon: "Mo", Mars: "Ma", Mercury: "Me",
+  Jupiter: "Ju", Venus: "Ve", Saturn: "Sa", Rahu: "Ra", Ketu: "Ke"
+};
+
 const CHART_ORDER = [
   ["D1", "Rashi"],
   ["D9", "Navamsha"],
@@ -101,35 +106,23 @@ function renderSouthIndianChart(chart: VargaChart) {
         const bodies = chart.planets.filter((planet) => planet.rashi === sign);
         const isLagna = chart.lagna.rashi === sign;
 
+        // Map planet names to 2-letter abbreviations
+        const bodyLabels = bodies.map((b) => PLANET_ABBR[b.name] || b.name.slice(0, 2));
+
         return (
-          <div key={index} className="min-h-24 border border-brass/20 p-2">
-            <div className="mb-1 flex items-center justify-between gap-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">
-                {isLagna ? "Lagna" : RASHI_ABBR[sign] ?? sign.slice(0, 2)}
-              </span>
-            </div>
-            <div className="space-y-1">
-              {isLagna && (
-                <div className="rounded-md bg-yellow-100 px-1.5 py-1 shadow-sm">
-                  <span className="text-xs font-semibold text-yellow-800">Lagna</span>
-                </div>
-              )}
-              {bodies.map((body) => (
-                <div
-                  key={`${body.name}-${body.rashi}-${body.degree_in_rashi}`}
-                  className="rounded-md bg-white/80 px-1.5 py-1 shadow-sm"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-xs font-semibold text-ink">{body.name}</span>
-                    {body.is_retrograde ? (
-                      <span className="text-[10px] font-bold text-red-700">R</span>
-                    ) : null}
-                  </div>
-                  <div className="truncate text-[10px] text-stone-600">
-                    {body.rashi} {formatDegree(body)}
-                  </div>
-                </div>
-              ))}
+          <div key={index} className="min-h-24 border border-brass/20 p-2 flex flex-col relative">
+            {/* Small faded sign abbreviation in the top left corner */}
+            <span className="absolute left-2 top-1 text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+              {RASHI_ABBR[sign] ?? sign.slice(0, 2)}
+            </span>
+
+            {/* Centered traditional text (e.g., "As, Su, Me") */}
+            <div className="flex flex-1 items-center justify-center text-center">
+              <div className="flex flex-wrap items-center justify-center text-sm font-semibold text-ink gap-1">
+                {isLagna && <span className="font-bold text-red-700">As</span>}
+                {isLagna && bodies.length > 0 && <span>,</span>}
+                <span>{bodyLabels.join(", ")}</span>
+              </div>
             </div>
           </div>
         );
@@ -178,21 +171,43 @@ function ChartPanel({ code, chart }: { code: string; chart: VargaChart }) {
 }
 
 export function ChartDisplay({ vargas }: ChartDisplayProps) {
+  const d1Chart = vargas["D1"];
+  const divisionalCharts = [
+    ["D9", "Navamsha"],
+    ["D10", "Dashamsha"],
+  ] as const;
+
   return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold text-ink">Varga Charts</h2>
-        <p className="text-sm text-stone-600">D1, D9, and D10 calculated from exact sidereal longitudes.</p>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-3">
-        {CHART_ORDER.map(([code, fallbackName]) => {
-          const chart = vargas[code];
-          if (!chart) {
-            return null;
-          }
-          return <ChartPanel key={code} code={code} chart={{ ...chart, name: chart.name || fallbackName }} />;
-        })}
-      </div>
-    </section>
+    <div className="space-y-10">
+      {/* 1. Primary Natal Chart Section */}
+      {d1Chart && (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold text-ink">Natal Chart</h2>
+            <p className="text-sm text-stone-600">Primary D1 (Rashi) chart calculated from exact sidereal longitudes.</p>
+          </div>
+          <div className="max-w-xl">
+            <ChartPanel code="D1" chart={{ ...d1Chart, name: "Natal Chart" }} />
+          </div>
+        </section>
+      )}
+
+      {/* 2. Divisional Charts Section */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-xl font-bold text-ink">Divisional Charts (Vargas)</h2>
+          <p className="text-sm text-stone-600">Detailed D9 and D10 charts for specific life areas.</p>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:max-w-4xl">
+          {divisionalCharts.map(([code, fallbackName]) => {
+            const chart = vargas[code as keyof ChartVargas];
+            if (!chart) {
+              return null;
+            }
+            return <ChartPanel key={code} code={code} chart={{ ...chart, name: chart.name || fallbackName }} />;
+          })}
+        </div>
+      </section>
+    </div>
   );
 }

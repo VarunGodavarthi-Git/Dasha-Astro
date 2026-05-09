@@ -298,26 +298,43 @@ def _d1_varga_payload(body: dict[str, Any], lagna_sign_index: int) -> dict[str, 
 
 
 def _varga_position(longitude: float, chart: str) -> dict[str, Any]:
+    """Calculates precise sign and degree placements for divisional charts."""
     longitude = longitude % 360
-    sign_index = int(longitude // 30)
-    degree_in_sign = longitude % 30
+    sign_index = int(longitude / 30.0)
+    degree_in_sign = longitude % 30.0
 
     if chart == "D9":
-        part_size = 30 / 9
-        part_index = min(8, int(degree_in_sign // part_size))
-        start_sign = _navamsha_start_sign(sign_index)
+        # 1. Calculate which of the 9 Navamshas it falls into
+        navamsha_length = 30.0 / 9.0
+        part_index = int(degree_in_sign / navamsha_length)
+        
+        # 2. Determine start sign based on the exact Element (Fire, Earth, Air, Water)
+        element_idx = sign_index % 4 
+        start_sign = (element_idx * 9) % 12
+        
         varga_sign = (start_sign + part_index) % 12
-        degree_in_varga = (degree_in_sign - part_index * part_size) * 9
+        degree_in_varga = (degree_in_sign - (part_index * navamsha_length)) * 9
+        
     elif chart == "D10":
-        part_size = 30 / 10
-        part_index = min(9, int(degree_in_sign // part_size))
-        start_sign = _dashamsha_start_sign(sign_index)
+        # 1. Calculate which of the 10 Dashamshas it falls into
+        dashamsha_length = 30.0 / 10.0
+        part_index = int(degree_in_sign / dashamsha_length)
+        
+        # 2. Apply Parashari odd/even sign rule
+        is_odd_sign = (sign_index % 2) == 0  # 0 is Aries (odd), 1 is Taurus (even), etc.
+        if is_odd_sign:
+            start_sign = sign_index
+        else:
+            start_sign = (sign_index + 8) % 12
+            
         varga_sign = (start_sign + part_index) % 12
-        degree_in_varga = (degree_in_sign - part_index * part_size) * 10
+        degree_in_varga = (degree_in_sign - (part_index * dashamsha_length)) * 10
+        
     else:
         raise ValueError(f"Unsupported varga chart: {chart}")
 
     varga_longitude = (varga_sign * 30 + degree_in_varga) % 360
+    
     return {
         "sign_index": varga_sign,
         "rashi": RASHIS[varga_sign],
@@ -346,23 +363,6 @@ def _varga_body_payload(
     if is_retrograde is not None:
         payload["is_retrograde"] = is_retrograde
     return payload
-
-
-def _navamsha_start_sign(sign_index: int) -> int:
-    modality = sign_index % 3
-    if modality == 0:
-        return sign_index
-    if modality == 1:
-        return (sign_index + 8) % 12
-    return (sign_index + 4) % 12
-
-
-def _dashamsha_start_sign(sign_index: int) -> int:
-    sign_number = sign_index + 1
-    is_odd_sign = sign_number % 2 == 1
-    if is_odd_sign:
-        return sign_index
-    return (sign_index + 8) % 12
 
 
 def _relative_house(sign_index: int, lagna_sign_index: int) -> int:
