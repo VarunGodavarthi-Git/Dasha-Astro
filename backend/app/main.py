@@ -11,42 +11,47 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .database import Base, SessionLocal, engine, get_db
-from .engine import AstrologyCalculationError, calculate_vedic_chart
-from .location import CityLookupError, GeocodedCity, geocode_city
-from .models import ChatLog, SavedChart
-from .prompts import VEDIC_ASTROLOGY_SYSTEM_PROMPT, build_user_prompt
-from .schemas import ChartRequest, ChartResponse, ChatLogOut, ClearLogsResponse, LocationSearchResponse
+# FIXED: Using Absolute Imports for Render/Linux compatibility
+from app.database import Base, SessionLocal, engine, get_db
+from app.engine import AstrologyCalculationError, calculate_vedic_chart
+from app.location import CityLookupError, GeocodedCity, geocode_city
+from app.models import ChatLog, SavedChart
+from app.prompts import VEDIC_ASTROLOGY_SYSTEM_PROMPT, build_user_prompt
+from app.schemas import ChartRequest, ChartResponse, ChatLogOut, ClearLogsResponse, LocationSearchResponse
 
-
+# Load environment variables from the root of the backend folder
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com").lower()
 NOMINATIM_USER_AGENT = os.getenv("NOMINATIM_USER_AGENT", "dasha-astro-geocoder")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 GEMINI_MAX_OUTPUT_TOKENS = int(os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "1200"))
 
 app = FastAPI(title="Dasha Astro API", version="0.2.0")
+
+# Updated CORS to handle Vercel deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_ORIGIN, "http://127.0.0.1:3000"],
+    allow_origins=[
+        FRONTEND_ORIGIN, 
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "https://dasha-astro-frontend.vercel.app" # You can add your specific Vercel URL here
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
 
-
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "llm_provider": "gemini", "model": GEMINI_MODEL}
-
 
 @app.get("/api/location/search", response_model=LocationSearchResponse)
 def search_location(query: str = Query(..., min_length=2, max_length=120)) -> LocationSearchResponse:
@@ -63,13 +68,11 @@ def search_location(query: str = Query(..., min_length=2, max_length=120)) -> Lo
         timezone=city.timezone,
     )
 
-
 @app.post("/api/chart", response_model=ChartResponse)
 def create_chart(payload: ChartRequest, db: Session = Depends(get_db)) -> ChartResponse:
     chart = _calculate_or_422(payload)
     _save_chart(db, payload, chart)
     return ChartResponse(chart=chart)
-
 
 @app.post("/api/chart/stream")
 def create_chart_and_stream(payload: ChartRequest, db: Session = Depends(get_db)) -> StreamingResponse:
@@ -82,7 +85,6 @@ def create_chart_and_stream(payload: ChartRequest, db: Session = Depends(get_db)
         media_type="text/plain; charset=utf-8",
     )
 
-
 @app.get("/admin/logs", response_model=list[ChatLogOut])
 def list_logs(
     x_user_email: str | None = Header(default=None),
@@ -90,7 +92,6 @@ def list_logs(
 ) -> list[ChatLog]:
     _require_admin(x_user_email)
     return list(db.scalars(select(ChatLog).order_by(ChatLog.created_at.desc())).all())
-
 
 @app.delete("/admin/logs", response_model=ClearLogsResponse)
 def clear_logs(
@@ -102,7 +103,7 @@ def clear_logs(
     db.commit()
     return ClearLogsResponse(deleted=result.rowcount or 0)
 
-
+# HELPER FUNCTIONS
 def _calculate_or_422(payload: ChartRequest) -> dict:
     try:
         if payload.latitude is not None and payload.longitude is not None and payload.timezone:
@@ -121,21 +122,17 @@ def _calculate_or_422(payload: ChartRequest) -> dict:
             city_name=payload.city_name,
             user_agent=NOMINATIM_USER_AGENT,
         )
-    except CityLookupError as exc:
+    except (CityLookupError, AstrologyCalculationError) as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-    except AstrologyCalculationError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
-
 
 def calculate_vedic_chart_from_city(payload: ChartRequest, city: GeocodedCity) -> dict:
-    from .engine import build_chart_from_coordinates
-
+    # FIXED: Absolute import here as well
+    from app.engine import build_chart_from_coordinates
     return build_chart_from_coordinates(
         birth_date=payload.date_of_birth,
         birth_time=payload.time_of_birth,
         city=city,
     )
-
 
 def _save_chart(db: Session, payload: ChartRequest, chart: dict) -> None:
     birth = chart["birth"]
@@ -153,14 +150,13 @@ def _save_chart(db: Session, payload: ChartRequest, chart: dict) -> None:
     db.add(saved)
     db.commit()
 
-
 def _gemini_stream_and_log(payload: ChartRequest, chart: dict, prompt: str) -> Iterator[str]:
     response_text: list[str] = []
     error_text: str | None = None
 
     try:
         if not GEMINI_API_KEY:
-            raise RuntimeError("GEMINI_API_KEY is not configured in backend/.env.")
+            raise RuntimeError("GEMINI_API_KEY is not configured.")
 
         from google import genai
         from google.genai import types
@@ -200,7 +196,6 @@ def _gemini_stream_and_log(payload: ChartRequest, chart: dict, prompt: str) -> I
                 )
             )
             db.commit()
-
 
 def _require_admin(user_email: str | None) -> None:
     if not user_email or user_email.lower() != ADMIN_EMAIL:
