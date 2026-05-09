@@ -57,7 +57,12 @@ export function ChartChat() {
   const [birthYear, setBirthYear] = useState("");
   const [birthMonth, setBirthMonth] = useState("01");
   const [birthDay, setBirthDay] = useState("01");
-  const [timeOfBirth, setTimeOfBirth] = useState("");
+  
+  // New 12-hour time state
+  const [birthHour, setBirthHour] = useState("12");
+  const [birthMinute, setBirthMinute] = useState("00");
+  const [birthAmPm, setBirthAmPm] = useState("AM");
+
   const [cityName, setCityName] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<LocationResult | null>(null);
   const [locationStatus, setLocationStatus] = useState<"idle" | "searching" | "error" | "done">("idle");
@@ -74,6 +79,14 @@ export function ChartChat() {
     }
     return `${birthYear}-${birthMonth}-${birthDay}`;
   }, [birthDay, birthMonth, birthYear]);
+
+  // Convert 12h format to 24h format for the backend
+  const timeOfBirth = useMemo(() => {
+    let h = parseInt(birthHour);
+    if (birthAmPm === "PM" && h < 12) h += 12;
+    if (birthAmPm === "AM" && h === 12) h = 0;
+    return `${twoDigit(h)}:${birthMinute}`;
+  }, [birthHour, birthMinute, birthAmPm]);
 
   const dayCount = useMemo(() => daysInMonth(birthYear, birthMonth), [birthMonth, birthYear]);
 
@@ -261,16 +274,44 @@ export function ChartChat() {
           </label>
         </div>
 
-        <label className="mb-4 block">
-          <span className="mb-1 block text-xs font-medium text-stone-700">Time</span>
-          <input
-            className="h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-ink focus:border-brass focus:outline-none focus:ring-1 focus:ring-brass"
-            onChange={(event) => setTimeOfBirth(event.target.value)}
-            required
-            type="time"
-            value={timeOfBirth}
-          />
-        </label>
+        {/* 12-Hour Time Selection Grid */}
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-700">Hour</span>
+            <select
+              className="h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-ink focus:border-brass focus:outline-none focus:ring-1 focus:ring-brass"
+              onChange={(e) => setBirthHour(e.target.value)}
+              value={birthHour}
+            >
+              {Array.from({ length: 12 }, (_, i) => (i + 1).toString()).map((h) => (
+                <option key={h} value={h}>{h}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-700">Min</span>
+            <select
+              className="h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-ink focus:border-brass focus:outline-none focus:ring-1 focus:ring-brass"
+              onChange={(e) => setBirthMinute(e.target.value)}
+              value={birthMinute}
+            >
+              {Array.from({ length: 60 }, (_, i) => twoDigit(i)).map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-700">AM/PM</span>
+            <select
+              className="h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-ink focus:border-brass focus:outline-none focus:ring-1 focus:ring-brass"
+              onChange={(e) => setBirthAmPm(e.target.value)}
+              value={birthAmPm}
+            >
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </label>
+        </div>
 
         <label className="mb-2 block">
           <span className="mb-1 block text-xs font-medium text-stone-700">Birth Place</span>
