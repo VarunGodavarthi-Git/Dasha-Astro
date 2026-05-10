@@ -1,3 +1,4 @@
+```python
 from __future__ import annotations
 
 import os
@@ -10,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
+from openai import OpenAI
 
 from app.database import Base, SessionLocal, engine, get_db
 from app.engine import AstrologyCalculationError, calculate_vedic_chart
@@ -32,20 +34,27 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 FRONTEND_ORIGIN = os.getenv(
     "FRONTEND_ORIGIN",
-    "https://dasha-astro-r3z1je8cb-varun-godavarthi-s-projects.vercel.app",
+    "https://dasha-astro.vercel.app",
 )
 
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com").lower()
+ADMIN_EMAIL = os.getenv(
+    "ADMIN_EMAIL",
+    "admin@example.com",
+).lower()
+
 NOMINATIM_USER_AGENT = os.getenv(
     "NOMINATIM_USER_AGENT",
     "dasha-astro-geocoder",
 )
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+OPENAI_API_KEY = os.getenv(
+    "OPENAI_API_KEY",
+    "",
+)
 
-GEMINI_MAX_OUTPUT_TOKENS = int(
-    os.getenv("GEMINI_MAX_OUTPUT_TOKENS", "1200")
+OPENAI_MODEL = os.getenv(
+    "OPENAI_MODEL",
+    "gpt-4.1-mini",
 )
 
 # FastAPI App
@@ -58,11 +67,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    FRONTEND_ORIGIN,
-    "https://dasha-astro.vercel.app",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-],
+        FRONTEND_ORIGIN,
+        "https://dasha-astro.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,8 +98,8 @@ def root():
 def health() -> dict[str, str]:
     return {
         "status": "ok",
-        "llm_provider": "gemini",
-        "model": GEMINI_MODEL,
+        "llm_provider": "openai",
+        "model": OPENAI_MODEL,
     }
 
 
@@ -107,6 +116,7 @@ def search_location(
             query,
             user_agent=NOMINATIM_USER_AGENT,
         )
+
     except CityLookupError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -123,13 +133,21 @@ def search_location(
 
 
 # Generate Chart
-@app.post("/api/chart", response_model=ChartResponse)
+@app.post(
+    "/api/chart",
+    response_model=ChartResponse,
+)
 def create_chart(
     payload: ChartRequest,
     db: Session = Depends(get_db),
 ) -> ChartResponse:
     chart = _calculate_or_422(payload)
-    _save_chart(db, payload, chart)
+
+    _save_chart(
+        db,
+        payload,
+        chart,
+    )
 
     return ChartResponse(chart=chart)
 
@@ -142,7 +160,11 @@ def create_chart_and_stream(
 ) -> StreamingResponse:
     chart = _calculate_or_422(payload)
 
-    _save_chart(db, payload, chart)
+    _save_chart(
+        db,
+        payload,
+        chart,
+    )
 
     prompt = build_user_prompt(
         chart,
@@ -150,7 +172,7 @@ def create_chart_and_stream(
     )
 
     return StreamingResponse(
-        _gemini_stream_and_log(
+        _openai_stream_and_log(
             payload,
             chart,
             prompt,
@@ -160,7 +182,10 @@ def create_chart_and_stream(
 
 
 # Admin Logs
-@app.get("/admin/logs", response_model=list[ChatLogOut])
+@app.get(
+    "/admin/logs",
+    response_model=list[ChatLogOut],
+)
 def list_logs(
     x_user_email: str | None = Header(default=None),
     db: Session = Depends(get_db),
@@ -169,13 +194,18 @@ def list_logs(
 
     return list(
         db.scalars(
-            select(ChatLog).order_by(ChatLog.created_at.desc())
+            select(ChatLog).order_by(
+                ChatLog.created_at.desc()
+            )
         ).all()
     )
 
 
 # Clear Logs
-@app.delete("/admin/logs", response_model=ClearLogsResponse)
+@app.delete(
+    "/admin/logs",
+    response_model=ClearLogsResponse,
+)
 def clear_logs(
     x_user_email: str | None = Header(default=None),
     db: Session = Depends(get_db),
@@ -192,7 +222,9 @@ def clear_logs(
 
 
 # Helpers
-def _calculate_or_422(payload: ChartRequest) -> dict:
+def _calculate_or_422(
+    payload: ChartRequest,
+) -> dict:
     try:
         if (
             payload.latitude is not None
@@ -259,7 +291,9 @@ def _save_chart(
         longitude=birth["longitude"],
         timezone=birth["timezone"],
         birth_date=payload.date_of_birth,
-        birth_time=payload.time_of_birth.strftime("%H:%M:%S"),
+        birth_time=payload.time_of_birth.strftime(
+            "%H:%M:%S"
+        ),
         chart_json=chart,
     )
 
@@ -268,7 +302,7 @@ def _save_chart(
     db.commit()
 
 
-def _gemini_stream_and_log(
+def _openai_stream_and_log(
     payload: ChartRequest,
     chart: dict,
     prompt: str,
@@ -278,38 +312,47 @@ def _gemini_stream_and_log(
     error_text: str | None = None
 
     try:
-        if not GEMINI_API_KEY:
+        if not OPENAI_API_KEY:
             raise RuntimeError(
-                "GEMINI_API_KEY is not configured."
+                "OPENAI_API_KEY is not configured."
             )
 
-        from google import genai
-        from google.genai import types
-
-        client = genai.Client(
-            api_key=GEMINI_API_KEY,
+        client = OpenAI(
+            api_key=OPENAI_API_KEY,
         )
 
-        stream = client.models.generate_content_stream(
-            model=GEMINI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=VEDIC_ASTROLOGY_SYSTEM_PROMPT,
-                temperature=0.35,
-                top_p=0.9,
-                max_output_tokens=GEMINI_MAX_OUTPUT_TOKENS,
-            ),
+        stream = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": VEDIC_ASTROLOGY_SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            temperature=0.35,
+            stream=True,
         )
 
         for chunk in stream:
-            token = getattr(chunk, "text", None)
+            token = (
+                chunk.choices[0]
+                .delta
+                .content
+            )
 
             if token:
                 response_text.append(token)
                 yield token
 
     except Exception as exc:
-        error_text = f"Gemini request failed: {exc}"
+        error_text = (
+            f"OpenAI request failed: {exc}"
+        )
+
         yield error_text
 
     finally:
@@ -330,17 +373,20 @@ def _gemini_stream_and_log(
                     prompt_text=prompt,
                     chart_json=chart,
                     ai_response=full_response,
-                    model=GEMINI_MODEL,
+                    model=OPENAI_MODEL,
                 )
             )
 
             db.commit()
 
 
-def _require_admin(user_email: str | None) -> None:
+def _require_admin(
+    user_email: str | None,
+) -> None:
     if (
         not user_email
-        or user_email.lower() != ADMIN_EMAIL
+        or user_email.lower()
+        != ADMIN_EMAIL
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
