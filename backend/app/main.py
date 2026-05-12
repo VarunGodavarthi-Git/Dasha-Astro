@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, func
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from openai import OpenAI
 
@@ -157,6 +158,21 @@ def create_chart_and_stream(
     payload: ChartRequest,
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
+
+    if payload.user_email:
+        twenty_four_hours_ago = datetime.utcnow() - timedelta(days=1)
+        usage_count = db.scalar(
+            select(func.count(ChatLog.id)).where(
+                ChatLog.user_email == payload.user_email,
+                ChatLog.created_at >= twenty_four_hours_ago
+            )
+        )
+        if usage_count is not None and usage_count >= 5:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="You have reached your daily limit of 5 free readings. Please try again tomorrow.",
+            )
+
     chart = _calculate_or_422(payload)
 
     _save_chart(
@@ -165,9 +181,21 @@ def create_chart_and_stream(
         chart,
     )
 
+
+    # Fetch chat history for context
+    history = []
+    if payload.user_email:
+        past_logs = db.scalars(
+            select(ChatLog).where(
+                ChatLog.user_email == payload.user_email
+            ).order_by(ChatLog.created_at.desc()).limit(3)
+        ).all()
+        history = list(reversed(past_logs))
+
     prompt = build_user_prompt(
         chart,
         payload.question,
+        payload.user_name,
     )
 
     return StreamingResponse(
@@ -175,6 +203,7 @@ def create_chart_and_stream(
             payload,
             chart,
             prompt,
+            history,
         ),
         media_type="text/plain; charset=utf-8",
     )
@@ -305,6 +334,7 @@ def _openai_stream_and_log(
     payload: ChartRequest,
     chart: dict,
     prompt: str,
+    history: list[ChatLog] = None,
 ) -> Iterator[str]:
     response_text: list[str] = []
 
@@ -320,18 +350,23 @@ def _openai_stream_and_log(
             api_key=OPENAI_API_KEY,
         )
 
+        messages = [
+            {
+                "role": "system",
+                "content": VEDIC_ASTROLOGY_SYSTEM_PROMPT,
+            }
+        ]
+
+        if history:
+            for log in history:
+                messages.append({"role": "user", "content": log.prompt_text})
+                messages.append({"role": "assistant", "content": log.ai_response})
+
+        messages.append({"role": "user", "content": prompt})
+
         stream = client.chat.completions.create(
             model=OPENAI_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": VEDIC_ASTROLOGY_SYSTEM_PROMPT,
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
+            messages=messages,
             temperature=0.35,
             stream=True,
         )
