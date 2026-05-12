@@ -25,6 +25,11 @@ export default function HomePage() {
           </div>
         </header>
         <ChartChat />
+        <footer className="mt-8 text-center text-sm text-stone-500 pb-8">
+          <Link href="/privacy" className="hover:text-stone-800 underline underline-offset-2 transition-colors">
+            Privacy Policy
+          </Link>
+        </footer>
       </div>
     </main>
   );

@@ -409,6 +409,25 @@ export function ChartChat() {
         </div>
 
         {/* Charts and Data Tables moved BELOW the reading */}
+
+        {chart?.vargas ? (
+          <div className="mb-4 flex justify-end">
+            <button
+              onClick={() => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(chart, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href",     dataStr);
+                downloadAnchorNode.setAttribute("download", "astro_chart.json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+              }}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-stone-300 bg-white px-4 text-sm font-medium text-stone-700 shadow-sm hover:bg-stone-50"
+            >
+              Download Chart Data (JSON)
+            </button>
+          </div>
+        ) : null}
         {chart?.vargas ? <ChartDisplay vargas={chart.vargas} /> : null}
 
         {chart?.dasha ? <DashaTable dasha={chart.dasha} /> : null}
