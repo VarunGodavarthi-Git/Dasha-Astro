@@ -29,14 +29,17 @@ Response format:
 
 def build_user_prompt(chart_json: dict, question: str | None, user_name: str | None = None) -> str:
     import json
+    from datetime import date
 
     user_question = question or "Give me a concise but meaningful Vedic reading of this birth chart."
     chart_block = json.dumps(chart_json, separators=(",", ":"), sort_keys=True)
     facts_block = _verified_facts(chart_json)
 
     greeting = f"User Name: {user_name}\n" if user_name else ""
+    current_date = date.today().isoformat()
 
     return (
+        f"IMPORTANT: The current date today is {current_date}. Always use this date to correctly calculate present and future timeline predictions.\n\n"
         f"{greeting}"
         "User question:\n"
         f"{user_question}\n\n"
