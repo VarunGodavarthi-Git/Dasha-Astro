@@ -136,12 +136,12 @@ export function ChartChat() {
     setSelectedLocation(null);
 
     try {
-      const url = new URL(`${apiBaseUrl}/api/location/search`);
-      url.searchParams.append("query", query);
+      const params = new URLSearchParams();
+      params.append("query", query);
       if (countryCode) {
-        url.searchParams.append("country", countryCode);
+        params.append("country", countryCode);
       }
-      const response = await fetch(url.toString());
+      const response = await fetch(`${apiBaseUrl}/api/location/search?${params.toString()}`);
       const data = await response.json().catch(() => null);
       if (!response.ok) {
         throw new Error(data?.detail ?? `Location search returned ${response.status}`);
