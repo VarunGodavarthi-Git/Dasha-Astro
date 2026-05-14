@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from geopy.exc import GeocoderServiceError, GeocoderTimedOut
-from geopy.geocoders import Nominatim
+from geopy.geocoders import OpenCage
 from timezonefinder import TimezoneFinder
 
 
@@ -24,16 +24,15 @@ class GeocodedCity:
 _TIMEZONE_FINDER = TimezoneFinder()
 
 
-def geocode_city(city_name: str, user_agent: str, geocoder: Any | None = None, country_codes: str | None = None) -> GeocodedCity:
+def geocode_city(city_name: str, api_key: str, geocoder: Any | None = None, country_codes: str | None = None) -> GeocodedCity:
     query = city_name.strip()
     if len(query) < 2:
         raise CityLookupError("Enter a valid city name.")
 
-    locator = geocoder or Nominatim(user_agent=user_agent, timeout=10)
+    locator = geocoder or OpenCage(api_key=api_key, timeout=10)
 
     kwargs = {
         "exactly_one": True,
-        "addressdetails": True,
     }
     if country_codes:
         kwargs["country_codes"] = country_codes

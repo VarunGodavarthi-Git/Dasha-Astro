@@ -77,20 +77,6 @@ NODE_TROPICAL_FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED
 HOUSE_FLAGS = swe.FLG_SIDEREAL
 
 
-def calculate_vedic_chart(
-    birth_date: date,
-    birth_time: time,
-    city_name: str,
-    user_agent: str,
-) -> dict[str, Any]:
-    geocoded = geocode_city(city_name, user_agent=user_agent)
-    return build_chart_from_coordinates(
-        birth_date=birth_date,
-        birth_time=birth_time,
-        city=geocoded,
-    )
-
-
 def build_chart_from_coordinates(
     birth_date: date,
     birth_time: time,
