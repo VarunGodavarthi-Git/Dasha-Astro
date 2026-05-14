@@ -110,11 +110,13 @@ def health() -> dict[str, str]:
 )
 def search_location(
     query: str = Query(..., min_length=2, max_length=120),
+    country: str | None = Query(default=None, max_length=10),
 ) -> LocationSearchResponse:
     try:
         city = geocode_city(
             query,
             user_agent=NOMINATIM_USER_AGENT,
+            country_codes=country,
         )
 
     except CityLookupError as exc:

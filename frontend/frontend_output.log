@@ -2,36 +2,19 @@
 > dasha-astro-frontend@0.1.0 start
 > next start
 
-  ▲ Next.js 14.2.35
-  - Local:        http://localhost:3000
-
- ✓ Starting...
- ✓ Ready in 437ms
-[next-auth][error][NO_SECRET]
-https://next-auth.js.org/errors#no_secret Please define a `secret` in production. MissingSecret [MissingSecretError]: Please define a `secret` in production.
-    at assertConfig (/app/frontend/node_modules/next-auth/core/lib/assert.js:32:12)
-    at AuthHandler (/app/frontend/node_modules/next-auth/core/index.js:59:52)
-    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
-    at async NextAuthApiHandler (/app/frontend/node_modules/next-auth/next/index.js:18:19)
-    at async NextAuth._args$ (/app/frontend/node_modules/next-auth/next/index.js:91:14)
-    at async K (/app/frontend/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
-    at async U.render (/app/frontend/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
-    at async NextNodeServer.runApi (/app/frontend/node_modules/next/dist/server/next-server.js:603:9)
-    at async NextNodeServer.handleCatchallRenderRequest (/app/frontend/node_modules/next/dist/server/next-server.js:269:37)
-    at async NextNodeServer.handleRequestImpl (/app/frontend/node_modules/next/dist/server/base-server.js:818:17) {
-  code: 'NO_SECRET'
-}
-[next-auth][error][NO_SECRET]
-https://next-auth.js.org/errors#no_secret Please define a `secret` in production. MissingSecret [MissingSecretError]: Please define a `secret` in production.
-    at assertConfig (/app/frontend/node_modules/next-auth/core/lib/assert.js:32:12)
-    at AuthHandler (/app/frontend/node_modules/next-auth/core/index.js:59:52)
-    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
-    at async NextAuthApiHandler (/app/frontend/node_modules/next-auth/next/index.js:18:19)
-    at async NextAuth._args$ (/app/frontend/node_modules/next-auth/next/index.js:91:14)
-    at async K (/app/frontend/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:16881)
-    at async U.render (/app/frontend/node_modules/next/dist/compiled/next-server/pages-api.runtime.prod.js:20:17520)
-    at async NextNodeServer.runApi (/app/frontend/node_modules/next/dist/server/next-server.js:603:9)
-    at async NextNodeServer.handleCatchallRenderRequest (/app/frontend/node_modules/next/dist/server/next-server.js:269:37)
-    at async NextNodeServer.handleRequestImpl (/app/frontend/node_modules/next/dist/server/base-server.js:818:17) {
-  code: 'NO_SECRET'
+ ⨯ Failed to start server
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2102:7)
+    at /app/frontend/node_modules/next/dist/server/lib/start-server.js:280:16
+    at new Promise (<anonymous>)
+    at startServer (/app/frontend/node_modules/next/dist/server/lib/start-server.js:191:11)
+    at Module.nextStart (/app/frontend/node_modules/next/dist/cli/next-start.js:25:40)
+    at /app/frontend/node_modules/next/dist/bin/next:105:856 {
+  code: 'EADDRINUSE',
+  errno: -98,
+  syscall: 'listen',
+  address: '::',
+  port: 3000
 }
