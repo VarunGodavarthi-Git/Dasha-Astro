@@ -196,6 +196,7 @@ def create_chart_and_stream(
         chart,
         payload.question,
         payload.user_name,
+        payload.gender,
     )
 
     return StreamingResponse(

@@ -293,7 +293,7 @@ The final reading should feel:
 """
 
 
-def build_user_prompt(chart_json: dict, question: str | None, user_name: str | None = None) -> str:
+def build_user_prompt(chart_json: dict, question: str | None, user_name: str | None = None, gender: str | None = None) -> str:
     import json
     from datetime import date
 
@@ -302,11 +302,13 @@ def build_user_prompt(chart_json: dict, question: str | None, user_name: str | N
     facts_block = _verified_facts(chart_json)
 
     greeting = f"User Name: {user_name}\n" if user_name else ""
+    gender_info = f"Gender: {gender}\n" if gender and gender.lower() not in ["do not want to share", "do_not_want_to_share"] else ""
+
     current_date = date.today().isoformat()
 
     return (
         f"IMPORTANT: The current date today is {current_date}. Always use this date to correctly calculate present and future timeline predictions.\n\n"
-        f"{greeting}"
+        f"{greeting}{gender_info}"
         "User question:\n"
         f"{user_question}\n\n"
         "Verified chart facts. Use these exact facts and do not alter the rashi names:\n"

@@ -54,6 +54,8 @@ function twoDigit(value: number): string {
 
 export function ChartChat() {
   const { data: session, status: authStatus } = useSession();
+  const [userName, setUserName] = useState("");
+  const [gender, setGender] = useState("Do not want to share");
   const [birthYear, setBirthYear] = useState("");
   const [birthMonth, setBirthMonth] = useState("01");
   const [birthDay, setBirthDay] = useState("01");
@@ -96,9 +98,15 @@ export function ChartChat() {
     }
   }, [birthDay, dayCount]);
 
+  useEffect(() => {
+    if (session?.user?.name && !userName) {
+      setUserName(session.user.name);
+    }
+  }, [session?.user?.name, userName]);
+
   const canSubmit = useMemo(() => {
-    return Boolean(session?.user?.email && dateOfBirth && timeOfBirth && cityName.trim() && status !== "streaming");
-  }, [cityName, dateOfBirth, session?.user?.email, status, timeOfBirth]);
+    return Boolean(session?.user?.email && userName.trim() && dateOfBirth && timeOfBirth && cityName.trim() && status !== "streaming");
+  }, [cityName, dateOfBirth, session?.user?.email, status, timeOfBirth, userName]);
 
   function buildPayload(includeQuestion = true) {
     return {
@@ -110,7 +118,8 @@ export function ChartChat() {
       timezone: selectedLocation?.timezone,
       question: includeQuestion ? question : "",
       user_email: session?.user?.email,
-      user_name: session?.user?.name,
+      user_name: userName.trim(),
+      gender: gender,
     };
   }
 
@@ -226,6 +235,33 @@ export function ChartChat() {
         <div className="mb-4 flex items-center gap-2">
           <Sparkles className="text-brass" size={18} />
           <h1 className="text-base font-semibold text-ink">Chart Input</h1>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-700">Name</span>
+            <input
+              className="h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-ink focus:border-brass focus:outline-none focus:ring-1 focus:ring-brass"
+              onChange={(event) => setUserName(event.target.value)}
+              placeholder="Your Name"
+              required
+              type="text"
+              value={userName}
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-700">Gender</span>
+            <select
+              className="h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-ink focus:border-brass focus:outline-none focus:ring-1 focus:ring-brass"
+              onChange={(event) => setGender(event.target.value)}
+              value={gender}
+            >
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Do not want to share">Do not want to share</option>
+            </select>
+          </label>
         </div>
 
         <div className="mb-4 grid grid-cols-[1fr_1fr_1.2fr] gap-2">
