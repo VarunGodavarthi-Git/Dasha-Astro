@@ -14,6 +14,7 @@ class ChartRequest(BaseModel):
     question: str | None = Field(default=None, max_length=1200)
     user_email: EmailStr | None = None
     user_name: str | None = Field(default=None, max_length=255)
+    gender: str | None = Field(default=None, max_length=50)
 
 
 class ChartResponse(BaseModel):

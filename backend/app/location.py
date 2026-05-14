@@ -35,7 +35,6 @@ def geocode_city(city_name: str, user_agent: str, geocoder: Any | None = None) -
             query,
             exactly_one=True,
             addressdetails=True,
-            country_codes="in",
         )
     except (GeocoderTimedOut, GeocoderServiceError) as exc:
         raise CityLookupError(f"Could not geocode '{query}'. Try again in a moment.") from exc
