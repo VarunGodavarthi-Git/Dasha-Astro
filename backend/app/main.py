@@ -159,7 +159,7 @@ def create_chart_and_stream(
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
 
-    if payload.user_email:
+    if payload.user_email and payload.user_email.lower() != ADMIN_EMAIL:
         twenty_four_hours_ago = datetime.utcnow() - timedelta(days=1)
         usage_count = db.scalar(
             select(func.count(ChatLog.id)).where(
