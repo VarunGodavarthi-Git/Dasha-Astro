@@ -5,6 +5,7 @@ import { Bot, Loader2, MapPin, Search, Send, Sparkles } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { ChartDisplay } from "./chart-display";
 import { DashaTable } from "./dasha-table";
+import { COUNTRIES } from "@/lib/countries";
 
 type Status = "idle" | "streaming" | "error" | "done";
 
@@ -56,6 +57,7 @@ export function ChartChat() {
   const { data: session, status: authStatus } = useSession();
   const [userName, setUserName] = useState("");
   const [gender, setGender] = useState("Do not want to share");
+  const [countryCode, setCountryCode] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [birthMonth, setBirthMonth] = useState("01");
   const [birthDay, setBirthDay] = useState("01");
@@ -134,7 +136,12 @@ export function ChartChat() {
     setSelectedLocation(null);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/api/location/search?query=${encodeURIComponent(query)}`);
+      const url = new URL(`${apiBaseUrl}/api/location/search`);
+      url.searchParams.append("query", query);
+      if (countryCode) {
+        url.searchParams.append("country", countryCode);
+      }
+      const response = await fetch(url.toString());
       const data = await response.json().catch(() => null);
       if (!response.ok) {
         throw new Error(data?.detail ?? `Location search returned ${response.status}`);
@@ -349,10 +356,30 @@ export function ChartChat() {
           </label>
         </div>
 
-        <label className="mb-2 block">
-          <span className="mb-1 block text-xs font-medium text-stone-700">Birth Place</span>
-          <div className="flex gap-2">
-            <input
+        <div className="mb-2 grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-700">Country</span>
+            <select
+              className="h-9 w-full rounded-md border border-stone-300 bg-white px-2.5 text-sm text-ink focus:border-brass focus:outline-none focus:ring-1 focus:ring-brass"
+              onChange={(event) => {
+                setCountryCode(event.target.value);
+                setSelectedLocation(null);
+                setLocationStatus("idle");
+                setLocationMessage("");
+              }}
+              value={countryCode}
+            >
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-stone-700">Birth Place</span>
+            <div className="flex gap-2">
+              <input
               className="h-9 min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-2.5 text-sm text-ink focus:border-brass focus:outline-none focus:ring-1 focus:ring-brass"
               onChange={(event) => {
                 setCityName(event.target.value);
@@ -370,12 +397,13 @@ export function ChartChat() {
               disabled={locationStatus === "searching" || cityName.trim().length < 2}
               onClick={searchLocation}
               title="Resolve place"
-              type="button"
-            >
-              {locationStatus === "searching" ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
-            </button>
-          </div>
-        </label>
+                type="button"
+              >
+                {locationStatus === "searching" ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+              </button>
+            </div>
+          </label>
+        </div>
 
         {locationMessage ? (
           <div

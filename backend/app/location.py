@@ -24,18 +24,22 @@ class GeocodedCity:
 _TIMEZONE_FINDER = TimezoneFinder()
 
 
-def geocode_city(city_name: str, user_agent: str, geocoder: Any | None = None) -> GeocodedCity:
+def geocode_city(city_name: str, user_agent: str, geocoder: Any | None = None, country_codes: str | None = None) -> GeocodedCity:
     query = city_name.strip()
     if len(query) < 2:
         raise CityLookupError("Enter a valid city name.")
 
     locator = geocoder or Nominatim(user_agent=user_agent, timeout=10)
+
+    kwargs = {
+        "exactly_one": True,
+        "addressdetails": True,
+    }
+    if country_codes:
+        kwargs["country_codes"] = country_codes
+
     try:
-        location = locator.geocode(
-            query,
-            exactly_one=True,
-            addressdetails=True,
-        )
+        location = locator.geocode(query, **kwargs)
     except (GeocoderTimedOut, GeocoderServiceError) as exc:
         raise CityLookupError(f"Could not geocode '{query}'. Try again in a moment.") from exc
 
