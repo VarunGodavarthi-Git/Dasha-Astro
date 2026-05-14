@@ -14,9 +14,9 @@ from sqlalchemy.orm import Session
 from openai import OpenAI
 
 from app.database import Base, SessionLocal, engine, get_db
-from app.engine import AstrologyCalculationError, calculate_vedic_chart
+from app.engine import AstrologyCalculationError
 from app.location import CityLookupError, GeocodedCity, geocode_city
-from app.models import ChatLog, SavedChart
+from app.models import ChatLog, SavedChart, CachedLocation
 from app.prompts import (
     VEDIC_ASTROLOGY_SYSTEM_PROMPT,
     build_user_prompt,
@@ -42,9 +42,9 @@ ADMIN_EMAIL = os.getenv(
     "admin@example.com",
 ).lower()
 
-NOMINATIM_USER_AGENT = os.getenv(
-    "NOMINATIM_USER_AGENT",
-    "dasha-astro-geocoder",
+OPENCAGE_API_KEY = os.getenv(
+    "OPENCAGE_API_KEY",
+    "",
 )
 
 OPENAI_API_KEY = os.getenv(
@@ -111,13 +111,41 @@ def health() -> dict[str, str]:
 def search_location(
     query: str = Query(..., min_length=2, max_length=120),
     country: str | None = Query(default=None, max_length=10),
+    db: Session = Depends(get_db),
 ) -> LocationSearchResponse:
+    normalized_query = query.strip().lower()
+    cached = db.scalar(select(CachedLocation).where(CachedLocation.query == normalized_query))
+    if cached:
+        return LocationSearchResponse(
+            query=cached.query,
+            display_name=cached.display_name,
+            latitude=cached.latitude,
+            longitude=cached.longitude,
+            timezone=cached.timezone,
+        )
+
+    if not OPENCAGE_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OPENCAGE_API_KEY is not configured.",
+        )
+
     try:
         city = geocode_city(
             query,
-            user_agent=NOMINATIM_USER_AGENT,
+            api_key=OPENCAGE_API_KEY,
             country_codes=country,
         )
+
+        new_cache = CachedLocation(
+            query=normalized_query,
+            display_name=city.display_name,
+            latitude=city.latitude,
+            longitude=city.longitude,
+            timezone=city.timezone,
+        )
+        db.add(new_cache)
+        db.commit()
 
     except CityLookupError as exc:
         raise HTTPException(
@@ -143,7 +171,7 @@ def create_chart(
     payload: ChartRequest,
     db: Session = Depends(get_db),
 ) -> ChartResponse:
-    chart = _calculate_or_422(payload)
+    chart = _calculate_or_422(payload, db)
 
     _save_chart(
         db,
@@ -175,7 +203,7 @@ def create_chart_and_stream(
                 detail="You have reached your daily limit of 5 free readings. Please try again tomorrow.",
             )
 
-    chart = _calculate_or_422(payload)
+    chart = _calculate_or_422(payload, db)
 
     _save_chart(
         db,
@@ -255,6 +283,7 @@ def clear_logs(
 # Helpers
 def _calculate_or_422(
     payload: ChartRequest,
+    db: Session,
 ) -> dict:
     try:
         if (
@@ -275,11 +304,41 @@ def _calculate_or_422(
                 city,
             )
 
-        return calculate_vedic_chart(
-            birth_date=payload.date_of_birth,
-            birth_time=payload.time_of_birth,
-            city_name=payload.city_name,
-            user_agent=NOMINATIM_USER_AGENT,
+        normalized_query = payload.city_name.strip().lower()
+        cached = db.scalar(select(CachedLocation).where(CachedLocation.query == normalized_query))
+        if cached:
+            city = GeocodedCity(
+                query=cached.query,
+                display_name=cached.display_name,
+                latitude=cached.latitude,
+                longitude=cached.longitude,
+                timezone=cached.timezone,
+            )
+        else:
+            if not OPENCAGE_API_KEY:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="OPENCAGE_API_KEY is not configured.",
+                )
+
+            city = geocode_city(
+                payload.city_name,
+                api_key=OPENCAGE_API_KEY,
+            )
+
+            new_cache = CachedLocation(
+                query=normalized_query,
+                display_name=city.display_name,
+                latitude=city.latitude,
+                longitude=city.longitude,
+                timezone=city.timezone,
+            )
+            db.add(new_cache)
+            db.commit()
+
+        return calculate_vedic_chart_from_city(
+            payload,
+            city,
         )
 
     except (
