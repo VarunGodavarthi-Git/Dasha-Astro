@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -39,19 +38,10 @@ def geocode_city(city_name: str, user_agent: str, geocoder: Any | None = None, c
     if country_codes:
         kwargs["country_codes"] = country_codes
 
-    location = None
-    last_exc = None
-
-    for attempt in range(3):
-        try:
-            location = locator.geocode(query, **kwargs)
-            break
-        except (GeocoderTimedOut, GeocoderServiceError) as exc:
-            last_exc = exc
-            if attempt < 2:
-                time.sleep(1 + attempt)  # simple backoff: 1s, then 2s
-            else:
-                raise CityLookupError(f"Could not geocode '{query}'. Try again in a moment.") from exc
+    try:
+        location = locator.geocode(query, **kwargs)
+    except (GeocoderTimedOut, GeocoderServiceError) as exc:
+        raise CityLookupError(f"Could not geocode '{query}'. Try again in a moment.") from exc
 
     if location is None:
         raise CityLookupError(f"Could not find coordinates for '{query}'.")

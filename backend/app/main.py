@@ -44,7 +44,7 @@ ADMIN_EMAIL = os.getenv(
 
 NOMINATIM_USER_AGENT = os.getenv(
     "NOMINATIM_USER_AGENT",
-    "dasha-astro-geocoder-v0.2.0-contact-admin@example.com",
+    "dasha-astro-geocoder",
 )
 
 OPENAI_API_KEY = os.getenv(
