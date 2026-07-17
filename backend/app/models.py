@@ -6,6 +6,21 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
 
+from sqlalchemy import UniqueConstraint
+
+class CachedLocation(Base):
+    __tablename__ = "cached_locations"
+    __table_args__ = (UniqueConstraint('query', 'country', name='uq_query_country'),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    query: Mapped[str] = mapped_column(String(255), index=True)
+    country: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    display_name: Mapped[str] = mapped_column(String(255))
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+    timezone: Mapped[str] = mapped_column(String(120))
+
+
 class SavedChart(Base):
     __tablename__ = "saved_charts"
 

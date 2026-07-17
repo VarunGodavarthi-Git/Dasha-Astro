@@ -42,9 +42,9 @@ ADMIN_EMAIL = os.getenv(
     "admin@example.com",
 ).lower()
 
-NOMINATIM_USER_AGENT = os.getenv(
-    "NOMINATIM_USER_AGENT",
-    "dasha-astro-geocoder",
+OPENCAGE_API_KEY = os.getenv(
+    "OPENCAGE_API_KEY",
+    "",
 )
 
 OPENAI_API_KEY = os.getenv(
@@ -111,11 +111,13 @@ def health() -> dict[str, str]:
 def search_location(
     query: str = Query(..., min_length=2, max_length=120),
     country: str | None = Query(default=None, max_length=10),
+    db: Session = Depends(get_db),
 ) -> LocationSearchResponse:
     try:
         city = geocode_city(
             query,
-            user_agent=NOMINATIM_USER_AGENT,
+            api_key=OPENCAGE_API_KEY,
+            db=db,
             country_codes=country,
         )
 
@@ -143,7 +145,7 @@ def create_chart(
     payload: ChartRequest,
     db: Session = Depends(get_db),
 ) -> ChartResponse:
-    chart = _calculate_or_422(payload)
+    chart = _calculate_or_422(payload, db)
 
     _save_chart(
         db,
@@ -175,7 +177,7 @@ def create_chart_and_stream(
                 detail="You have reached your daily limit of 5 free readings. Please try again tomorrow.",
             )
 
-    chart = _calculate_or_422(payload)
+    chart = _calculate_or_422(payload, db)
 
     _save_chart(
         db,
@@ -255,6 +257,7 @@ def clear_logs(
 # Helpers
 def _calculate_or_422(
     payload: ChartRequest,
+    db: Session,
 ) -> dict:
     try:
         if (
@@ -279,7 +282,8 @@ def _calculate_or_422(
             birth_date=payload.date_of_birth,
             birth_time=payload.time_of_birth,
             city_name=payload.city_name,
-            user_agent=NOMINATIM_USER_AGENT,
+            api_key=OPENCAGE_API_KEY,
+            db=db,
         )
 
     except (

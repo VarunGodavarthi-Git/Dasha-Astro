@@ -81,9 +81,10 @@ def calculate_vedic_chart(
     birth_date: date,
     birth_time: time,
     city_name: str,
-    user_agent: str,
+    api_key: str,
+    db: Any,
 ) -> dict[str, Any]:
-    geocoded = geocode_city(city_name, user_agent=user_agent)
+    geocoded = geocode_city(city_name, api_key=api_key, db=db)
     return build_chart_from_coordinates(
         birth_date=birth_date,
         birth_time=birth_time,
