@@ -56,6 +56,7 @@ function twoDigit(value: number): string {
 export function ChartChat() {
   const { data: session, status: authStatus } = useSession();
   const [userName, setUserName] = useState("");
+  const [hasInitializedName, setHasInitializedName] = useState(false);
   const [gender, setGender] = useState("Do not want to share");
   const [countryCode, setCountryCode] = useState("");
   const [birthYear, setBirthYear] = useState("");
@@ -101,10 +102,11 @@ export function ChartChat() {
   }, [birthDay, dayCount]);
 
   useEffect(() => {
-    if (session?.user?.name && !userName) {
+    if (session?.user?.name && !hasInitializedName) {
       setUserName(session.user.name);
+      setHasInitializedName(true);
     }
-  }, [session?.user?.name, userName]);
+  }, [session?.user?.name, hasInitializedName]);
 
   const canSubmit = useMemo(() => {
     return Boolean(session?.user?.email && userName.trim() && dateOfBirth && timeOfBirth && cityName.trim() && status !== "streaming");
