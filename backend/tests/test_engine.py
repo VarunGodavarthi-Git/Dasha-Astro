@@ -11,9 +11,17 @@ class EmptyGeocoder:
         return None
 
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.models import Base
+
 def test_invalid_city_raises_clear_error():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    db = Session()
     with pytest.raises(CityLookupError):
-        geocode_city("NotARealCityNameForThisDemo", "test-agent", geocoder=EmptyGeocoder())
+        geocode_city("NotARealCityNameForThisDemo", api_key="fake", db=db, geocoder=EmptyGeocoder())
 
 
 def test_build_chart_from_coordinates_has_core_payload():
