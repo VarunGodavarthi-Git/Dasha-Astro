@@ -1,18 +1,14 @@
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import type { NextAuthOptions } from "next-auth";
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import FacebookProvider from "next-auth/providers/facebook";
 import GoogleProvider from "next-auth/providers/google";
 
-import { prisma } from "@/lib/prisma";
-
 const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase();
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "admin";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
   },
@@ -50,30 +46,6 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.FACEBOOK_CLIENT_SECRET ?? "",
     }),
   ],
-  events: {
-    async createUser({ user }) {
-      if (!user.email) {
-        return;
-      }
-
-      const role = user.email.toLowerCase() === adminEmail ? "ADMIN" : "USER";
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { role },
-      });
-    },
-    async signIn({ user }) {
-      if (!user.email) {
-        return;
-      }
-
-      const role = user.email.toLowerCase() === adminEmail ? "ADMIN" : "USER";
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { role },
-      });
-    },
-  },
   callbacks: {
     async signIn({ user }) {
       return Boolean(user.email);
