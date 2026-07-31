@@ -18,8 +18,9 @@ from app.engine import AstrologyCalculationError, calculate_vedic_chart
 from app.location import CityLookupError, GeocodedCity, geocode_city
 from app.models import ChatLog, SavedChart
 from app.prompts import (
-    VEDIC_ASTROLOGY_SYSTEM_PROMPT,
     build_user_prompt,
+    get_intent_classification,
+    get_system_prompt_for_intent,
 )
 from app.schemas import (
     ChartRequest,
@@ -353,10 +354,13 @@ def _openai_stream_and_log(
             api_key=OPENAI_API_KEY,
         )
 
+        intent = get_intent_classification(payload.question, client, OPENAI_MODEL)
+        system_prompt = get_system_prompt_for_intent(intent)
+
         messages = [
             {
                 "role": "system",
-                "content": VEDIC_ASTROLOGY_SYSTEM_PROMPT,
+                "content": system_prompt,
             }
         ]
 
