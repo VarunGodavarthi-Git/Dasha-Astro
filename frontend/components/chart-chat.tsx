@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Loader2, MapPin, Search, Send, Sparkles } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { ChartDisplay } from "./chart-display";
@@ -55,6 +55,7 @@ function twoDigit(value: number): string {
 
 export function ChartChat() {
   const { data: session, status: authStatus } = useSession();
+  const hasAutoPopulatedName = useRef(false);
   const [userName, setUserName] = useState("");
   const [gender, setGender] = useState("Do not want to share");
   const [countryCode, setCountryCode] = useState("");
@@ -101,10 +102,11 @@ export function ChartChat() {
   }, [birthDay, dayCount]);
 
   useEffect(() => {
-    if (session?.user?.name && !userName) {
+    if (session?.user?.name && !hasAutoPopulatedName.current) {
       setUserName(session.user.name);
+      hasAutoPopulatedName.current = true;
     }
-  }, [session?.user?.name, userName]);
+  }, [session?.user?.name]);
 
   const canSubmit = useMemo(() => {
     return Boolean(session?.user?.email && userName.trim() && dateOfBirth && timeOfBirth && cityName.trim() && status !== "streaming");
