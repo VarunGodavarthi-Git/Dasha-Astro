@@ -112,13 +112,16 @@ def health() -> dict[str, str]:
 def search_location(
     query: str = Query(..., min_length=2, max_length=120),
     country: str | None = Query(default=None, max_length=10),
+    db: Session = Depends(get_db),
 ) -> LocationSearchResponse:
     try:
         city = geocode_city(
             query,
             user_agent=NOMINATIM_USER_AGENT,
             country_codes=country,
+            db=db,
         )
+        db.commit()
 
     except CityLookupError as exc:
         raise HTTPException(
@@ -144,7 +147,7 @@ def create_chart(
     payload: ChartRequest,
     db: Session = Depends(get_db),
 ) -> ChartResponse:
-    chart = _calculate_or_422(payload)
+    chart = _calculate_or_422(payload, db)
 
     _save_chart(
         db,
@@ -176,7 +179,7 @@ def create_chart_and_stream(
                 detail="You have reached your daily limit of 5 free readings. Please try again tomorrow.",
             )
 
-    chart = _calculate_or_422(payload)
+    chart = _calculate_or_422(payload, db)
 
     _save_chart(
         db,
@@ -256,6 +259,7 @@ def clear_logs(
 # Helpers
 def _calculate_or_422(
     payload: ChartRequest,
+    db: Session,
 ) -> dict:
     try:
         if (
@@ -281,6 +285,7 @@ def _calculate_or_422(
             birth_time=payload.time_of_birth,
             city_name=payload.city_name,
             user_agent=NOMINATIM_USER_AGENT,
+            db=db,
         )
 
     except (

@@ -6,6 +6,18 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
 
+class CachedLocation(Base):
+    __tablename__ = "cached_locations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    query_key: Mapped[str] = mapped_column(String(255), index=True, unique=True)
+    display_name: Mapped[str] = mapped_column(String(255))
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+    timezone: Mapped[str] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class SavedChart(Base):
     __tablename__ = "saved_charts"
 
