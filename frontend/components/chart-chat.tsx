@@ -143,14 +143,13 @@ export function ChartChat() {
       url.searchParams.append("q", query);
       url.searchParams.append("format", "json");
       url.searchParams.append("limit", "1");
+      // Nominatim requires identification, but standard fetch forbids setting User-Agent.
+      // Use the email parameter instead.
+      url.searchParams.append("email", "dasha-astro@example.com");
       if (countryCode) {
         url.searchParams.append("countrycodes", countryCode);
       }
-      const response = await fetch(url.toString(), {
-        headers: {
-          "User-Agent": "dasha-astro-geocoder-frontend",
-        },
-      });
+      const response = await fetch(url.toString());
       const data = await response.json().catch(() => null);
       if (!response.ok) {
         throw new Error(`Location search returned ${response.status}`);
