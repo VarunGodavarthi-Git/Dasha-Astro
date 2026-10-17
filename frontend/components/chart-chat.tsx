@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Loader2, MapPin, Search, Send, Sparkles } from "lucide-react";
 import { useSession } from "next-auth/react";
+import tzlookup from "tz-lookup";
 import { ChartDisplay } from "./chart-display";
 import { DashaTable } from "./dasha-table";
 import { COUNTRIES } from "@/lib/countries";
@@ -138,19 +139,41 @@ export function ChartChat() {
     setSelectedLocation(null);
 
     try {
-      const url = new URL(`${apiBaseUrl}/api/location/search`);
-      url.searchParams.append("query", query);
+      const url = new URL("https://nominatim.openstreetmap.org/search");
+      url.searchParams.append("q", query);
+      url.searchParams.append("format", "json");
+      url.searchParams.append("limit", "1");
+      // Nominatim requires identification, but standard fetch forbids setting User-Agent.
+      // Use the email parameter instead.
+      url.searchParams.append("email", "dasha-astro@example.com");
       if (countryCode) {
-        url.searchParams.append("country", countryCode);
+        url.searchParams.append("countrycodes", countryCode);
       }
       const response = await fetch(url.toString());
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(data?.detail ?? `Location search returned ${response.status}`);
+        throw new Error(`Location search returned ${response.status}`);
       }
-      setSelectedLocation(data);
+      if (!data || data.length === 0) {
+        throw new Error(`Could not find coordinates for '${query}'.`);
+      }
+
+      const location = data[0];
+      const latitude = parseFloat(location.lat);
+      const longitude = parseFloat(location.lon);
+      const timezoneName = tzlookup(latitude, longitude) || "UTC";
+
+      const result: LocationResult = {
+        query: query,
+        display_name: location.display_name,
+        latitude: latitude,
+        longitude: longitude,
+        timezone: timezoneName,
+      };
+
+      setSelectedLocation(result);
       setLocationStatus("done");
-      setLocationMessage(`${data.display_name} (${data.latitude.toFixed(5)}, ${data.longitude.toFixed(5)}, ${data.timezone})`);
+      setLocationMessage(`${result.display_name} (${result.latitude.toFixed(5)}, ${result.longitude.toFixed(5)}, ${result.timezone})`);
     } catch (caught) {
       setLocationStatus("error");
       setLocationMessage(caught instanceof Error ? caught.message : "Could not resolve this place.");
